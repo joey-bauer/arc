@@ -6,6 +6,7 @@ import streamlit as st
 
 from database import (
     get_active_session,
+    get_completed_sessions,
     initialize_database,
     start_session,
     stop_session,
@@ -64,7 +65,7 @@ with st.container(border=True, key="coding_timer"):
 
         st.metric(
             "Elapsed Time",
-            f"{hours:02d}:{minutes:02d:{seconds:02d}}",
+            f"{hours:02d}:{minutes:02d}:{seconds:02d}",
         )
         st.caption("Coding session active.")
 
@@ -84,3 +85,29 @@ with st.container(border=True, key="coding_timer"):
                     f"Session saved: {duration} seconds of coding."
                 )
                 st.rerun()
+
+
+with st.container(border=True, key="session_log"):
+    st.subheader("Session Log")
+    st.caption("Your ten most recent completed sessions. Start times are local.")
+
+    try:
+        completed_sessions = get_completed_sessions()
+    except sqlite3.Error:
+        st.error("Could not load the session log. Please refresh to try again.")
+    else:
+        if not completed_sessions:
+            st.info("No completed sessions yet. Start a coding session and stop it to see it here.")
+        else:
+            session_rows = []
+            for session in completed_sessions:
+                # Keep UTC in storage and convert only for display.
+                local_start = datetime.fromisoformat(session["started_at"]).astimezone()
+                hours, remainder = divmod(session["duration_seconds"], 3600)
+                minutes, seconds = divmod(remainder, 60)
+                session_rows.append({
+                    "Started": local_start.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                    "Duration (HH:MM:SS)": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+                })
+
+            st.dataframe(session_rows, hide_index=True, width="stretch")

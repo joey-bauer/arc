@@ -56,6 +56,23 @@ def get_active_session():
         connection.close()
 
 
+def get_completed_sessions():
+    """Return the ten most recently started completed sessions."""
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute("""
+            SELECT id, started_at, ended_at, duration_seconds
+            FROM sessions
+            WHERE ended_at IS NOT NULL
+            ORDER BY started_at DESC, id DESC
+            LIMIT 10
+        """).fetchall()
+    finally:
+        connection.close()
+
+
 def start_session():
     """Start a session and return its ID."""
     started_at = datetime.now(timezone.utc).isoformat()
