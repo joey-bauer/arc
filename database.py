@@ -11,6 +11,14 @@ def initialize_database():
     connection = sqlite3.connect(DATABASE_PATH)
 
     try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
         with connection:
             # Timestamps will be stored as timezone-aware UTC ISO strings.
             connection.execute("""
@@ -38,6 +46,40 @@ def initialize_database():
                 ON sessions ((1))
                 WHERE ended_at IS NULL
             """)
+    finally:
+        connection.close()
+
+def create_project(name):
+    """Save a project and return its ID."""
+    name = name.strip()
+
+    if not name:
+        raise ValueError("Enter project name.")
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    try:
+        with connection:
+            cursor = connection.execute(
+                "INSERT INTO projects (name, created_at) VALUES (?, ?)",
+                (name, created_at),
+            )
+            return cursor.lastrowid
+    finally:
+        connection.close()
+
+def get_projects():
+    """Return all projects, newest first."""
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute("""
+            SELECT id, name, created_at
+            FROM projects
+            ORDER BY created_at DESC, id DESC
+        """).fetchall()
     finally:
         connection.close()
 

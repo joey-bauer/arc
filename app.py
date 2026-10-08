@@ -7,6 +7,7 @@ import streamlit as st
 from database import (
     get_active_session,
     get_completed_sessions,
+    get_projects,
     initialize_database,
     start_session,
     stop_session,
@@ -111,3 +112,23 @@ with st.container(border=True, key="session_log"):
                 })
 
             st.dataframe(session_rows, hide_index=True, width="stretch")
+
+with st.container(border=True, key="project_bays"):
+    st.subheader("Project Bays")
+
+    with st.form(key="add_project_form"):
+        project_name = st.text_input(
+            "Project name",
+            key="new_project_name",
+        )
+        submitted = st.form_submit_button("Add Project")
+
+    if submitted:
+        try:
+            create_project(project_name)
+        except ValueError as error:
+            st.warning(str(error))
+        except sqlite3.Error:
+            st.error("Could not save the project. Please try again.")
+        else:
+            st.success("Project saved.")
