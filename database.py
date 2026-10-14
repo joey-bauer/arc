@@ -99,32 +99,51 @@ def get_active_session():
 
 
 def get_completed_sessions():
-    """Return the ten most recently started completed sessions."""
+    """Return the ten most recently started completed sessions with project names."""
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
 
     try:
         return connection.execute("""
-            SELECT id, started_at, ended_at, duration_seconds
+            SELECT
+                sessions.id,
+                sessions.started_at,
+                sessions.ended_at,
+                sessions.duration_seconds,
+                projects.name AS project_name
             FROM sessions
-            WHERE ended_at IS NOT NULL
-            ORDER BY started_at DESC, id DESC
+            LEFT JOIN projects ON sessions.project_id = projects.id
+            WHERE sessions.ended_at IS NOT NULL
+            ORDER BY sessions.started_at DESC, sessions.id DESC
             LIMIT 10
         """).fetchall()
     finally:
         connection.close()
 
-
-def start_session():
-    """Start a session and return its ID."""
+def start_session(project_id):
+    """Start a session for an existing project and return its session ID."""
     started_at = datetime.now(timezone.utc).isoformat()
     connection = sqlite3.connect(DATABASE_PATH)
 
     try:
         with connection:
+            # Keep project validation and session creation in one transaction.
+            connection.execute("BEGIN IMMEDIATE")
+
+            project = connection.execute(
+                "SELECT id FROM projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+
+            if project is None:
+                raise ValueError("Choose an existing project.")
+
             cursor = connection.execute(
-                "INSERT INTO sessions (started_at) VALUES (?)",
-                (started_at,),
+                """
+                INSERT INTO sessions (project_id, started_at)
+                VALUES (?, ?)
+                """,
+                (project_id, started_at),
             )
             return cursor.lastrowid
     finally:

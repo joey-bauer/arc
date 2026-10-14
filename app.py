@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from database import (
+    create_project,
     get_active_session,
     get_completed_sessions,
     get_projects,
@@ -36,23 +37,45 @@ with st.container(border=True, key="coding_timer"):
 
     if active_session is None:
         st.metric("Elapsed Time", "00:00:00")
-        st.caption("No coding session is active.")
+        st.caption("No coding session active.")
 
-        if st.button(
-            "Start Coding Session",
-            key="start_session",
-            type="primary",
-        ):
-            try:
-                start_session()
-            except sqlite3.IntegrityError:
-                st.warning(
-                    "A session is already active. Refresh to see it."
-                )
-            except sqlite3.Error:
-                st.error("Could not start the session. Please try again.")
+        try:
+            projects = get_projects()
+        except sqlite3.Error:
+            st.error("Could not load projects. Please refresh to try again.")
+        else:
+            if not projects:
+                st.info("Add a project in Project Bays before starting a session.")
             else:
-                st.rerun()
+                project_names = {
+                    project["id"]: project["name"]
+                    for project in projects
+                }
+
+                selected_project_id = st.selectbox(
+                    "Project",
+                    options=list(project_names),
+                    format_func=lambda project_id: project_names[project_id],
+                    key="session_project"
+                )
+
+                if st.button(
+                    "Start Coding Session",
+                    key="start_session",
+                    type="primary",
+                ):
+                    try:
+                        start_session(selected_project_id)
+                    except ValueError as error:
+                        st.warning(str(error))
+                    except sqlite3.IntegrityError:
+                        st.warning(
+                            "A session is already active. Refresh to see it."
+                        )
+                    except sqlite3.Error:
+                        st.error("Could not start the session. Please try again.")
+                    else:
+                        st.rerun()
 
     else:
         started_at = datetime.fromisoformat(active_session["started_at"])
@@ -107,6 +130,7 @@ with st.container(border=True, key="session_log"):
                 hours, remainder = divmod(session["duration_seconds"], 3600)
                 minutes, seconds = divmod(remainder, 60)
                 session_rows.append({
+                    "Project": session["project_name"] or "Unassigned",
                     "Started": local_start.strftime("%Y-%m-%d %H:%M:%S %Z"),
                     "Duration (HH:MM:SS)": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
                 })
@@ -132,3 +156,23 @@ with st.container(border=True, key="project_bays"):
             st.error("Could not save the project. Please try again.")
         else:
             st.success("Project saved.")
+
+    try:
+        projects = get_projects()
+    except sqlite3.Error:
+        st.error("Could not load projects. Please refresh to try again.")
+    else:
+        if not projects:
+            st.info("No projects yet. Add your first project above.")
+        else:
+            project_rows = []
+            for project in projects:
+                project_rows.append({
+                    "Project": project["name"],
+                })
+
+            st.dataframe(
+                project_rows,
+                hide_index=True,
+                width="stretch",
+            )
