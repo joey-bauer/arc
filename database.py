@@ -19,6 +19,17 @@ def initialize_database():
             )
         """)
 
+        project_columns = connection.execute(
+            "PRAGMA table_info(projects)"
+        ).fetchall()
+
+        column_names = [column[1] for column in project_columns]
+
+        if "next_step" not in column_names:
+            connection.execute(
+                "ALTER TABLE projects ADD COLUMN next_step TEXT NOT NULL DEFAULT ''"
+            )
+
         with connection:
             # Timestamps will be stored as timezone-aware UTC ISO strings.
             connection.execute("""
@@ -76,10 +87,27 @@ def get_projects():
 
     try:
         return connection.execute("""
-            SELECT id, name, created_at
+            SELECT id, name, created_at, next_step
             FROM projects
             ORDER BY created_at DESC, id DESC
         """).fetchall()
+    finally:
+        connection.close()
+
+def update_project_next_step(project_id, next_step):
+    """Save a project's next step; empty text clears the note."""
+    next_step = next_step.strip()
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    try:
+        with connection:
+            cursor = connection.execute(
+                "UPDATE projects SET next_step = ? WHERE id = ?",
+                (next_step, project_id)
+            )
+
+            if cursor.rowcount == 0:
+                raise ValueError("Choose an existing project.")
     finally:
         connection.close()
 

@@ -32,6 +32,23 @@ completion_message = st.session_state.pop("completion_message", None)
 if completion_message:
     st.success(completion_message)
 
+@st.fragment(run_every=1)
+def render_elapsed_timer(started_at_iso):
+    started_at = datetime.fromisoformat(started_at_iso)
+
+    elapsed_seconds = max(
+        0,
+        int((datetime.now(timezone.utc) - started_at).total_seconds()),
+    )
+
+    hours, remainder = divmod(elapsed_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    st.metric(
+        "Elapsed Time",
+        f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    )
+
 with st.container(border=True, key="coding_timer"):
     st.subheader("Coding Session")
 
@@ -78,19 +95,7 @@ with st.container(border=True, key="coding_timer"):
                         st.rerun()
 
     else:
-        started_at = datetime.fromisoformat(active_session["started_at"])
-        elapsed_seconds = max(
-            0,
-            int((datetime.now(timezone.utc) - started_at).total_seconds()),
-        )
-
-        hours, remainder = divmod(elapsed_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-
-        st.metric(
-            "Elapsed Time",
-            f"{hours:02d}:{minutes:02d}:{seconds:02d}",
-        )
+        render_elapsed_timer(active_session["started_at"])
         st.caption("Coding session active.")
 
         if st.button(
@@ -176,3 +181,38 @@ with st.container(border=True, key="project_bays"):
                 hide_index=True,
                 width="stretch",
             )
+
+with st.container(border=True, key="resume_mission"):
+    st.subheader("Resume Mission")
+    st.caption("Leave yourself a next step for each project.")
+
+    try:
+        resume_projects = get_projects()
+    except sqlite3.Error:
+        st.error("Could not load projects. Please refresh to try again.")
+    else:
+        if not resume_projects:
+            st.info("Add a project in Project Bays to leave a next step.")
+        else:
+            projects_by_id = {
+                project["id"]: project
+                for project in resume_projects
+            }
+
+            resume_project_id = st.selectbox(
+                "Project",
+                options=list(projects_by_id),
+                format_func=lambda project_id: projects_by_id[project_id]["name"],
+                key="resume_project",
+            )
+
+            selected_project = projects_by_id[resume_project_id]
+
+            with st.form(key=f"next_step_form_{resume_project_id}"):
+                next_step = st.text_area(
+                    "Where will you pick up next time?",
+                    value=selected_project["next_step"],
+                    key=f"next_step_{resume_project_id}",
+                )
+
+                save_next_step = st.form_submit_button("Save Next Step")
