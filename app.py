@@ -9,6 +9,7 @@ from database import (
     get_active_session,
     get_completed_sessions,
     get_projects,
+    update_project_next_step,
     initialize_database,
     start_session,
     stop_session,
@@ -76,6 +77,17 @@ with st.container(border=True, key="coding_timer"):
                     key="session_project"
                 )
 
+                selected_session_project = next(
+                    project
+                    for project in projects
+                    if project["id"] == selected_project_id
+                )
+
+                if selected_session_project["next_step"]:
+                    st.info(selected_session_project["next_step"])
+                else:
+                    st.caption("No next step saved for this project yet.")
+
                 if st.button(
                     "Start Coding Session",
                     key="start_session",
@@ -96,7 +108,13 @@ with st.container(border=True, key="coding_timer"):
 
     else:
         render_elapsed_timer(active_session["started_at"])
-        st.caption("Coding session active.")
+        project_name = active_session["project_name"] or "Unassigned"
+        st.caption(f"Coding session active: {project_name}")
+
+        if active_session["next_step"]:
+            st.info(active_session["next_step"])
+        else:
+            st.caption("No next step saved for this project yet.")
 
         if st.button(
             "Stop Coding Session",
@@ -216,3 +234,14 @@ with st.container(border=True, key="resume_mission"):
                 )
 
                 save_next_step = st.form_submit_button("Save Next Step")
+
+            if save_next_step:
+                try:
+                    update_project_next_step(resume_project_id, next_step)
+                except ValueError as error:
+                    st.warning(str(error))
+                except sqlite3.Error:
+                    st.error("Could not save the next step. Please try again.")
+                else:
+                    st.session_state["completion_message"] = "Next step saved."
+                    st.rerun()

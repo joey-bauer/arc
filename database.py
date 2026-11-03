@@ -57,6 +57,17 @@ def initialize_database():
                 ON sessions ((1))
                 WHERE ended_at IS NULL
             """)
+
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS codewars_profiles (
+                username TEXT PRIMARY KEY,
+                honor INTEGER NOT NULL CHECK (honor >= 0),
+                overall_rank TEXT,
+                completed_kata INTEGER NOT NULL CHECK (completed_kata >= 0),
+                last_synced_at TEXT NOT NULL
+                )
+            """)
+
     finally:
         connection.close()
 
@@ -118,9 +129,15 @@ def get_active_session():
 
     try:
         return connection.execute("""
-        SELECT id, project_id, started_at
+        SELECT
+            sessions.id,
+            sessions.project_id,
+            sessions.started_at,
+            projects.name AS project_name,
+            projects.next_step
         FROM sessions
-        WHERE ended_at IS NULL
+        LEFT JOIN projects ON sessions.project_id = projects.id
+        WHERE sessions.ended_at IS NULL
     """).fetchone()
     finally:
         connection.close()
@@ -215,5 +232,60 @@ def stop_session(session_id):
             )
 
             return duration_seconds
+    finally:
+        connection.close()
+
+def save_codewars_profile(username, honor, overall_rank, completed_kata):
+    """Save as sucessfully fetched profile using a UTC sync timestamp."""
+    username = username.strip()
+
+    if not username:
+        raise ValueError("Enter a Codewars username.")
+
+    if type(honor) is not int or honor < 0:
+        raise ValueError("Honor must be a non-negative integer.")
+
+    if type(completed_kata) is not int or completed_kata < 0:
+        raise ValueError("Completed kata must be a non-negative integer.")
+
+    last_synced_at = datetime.now(timezone.utc).isoformat()
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    try:
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO codewars_profiles (
+                username, honor, overall_rank,
+                completed_kata, last_synced_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(username) DO UPDATE SET
+                    honor = excluded.honor,
+                    overall_rank = excluded.overall_rank,
+                    completed_kata = excluded.completed_kata,
+                    last_synced_at = excluded.last_synced_at
+                """,
+                (username, honor, overall_rank, completed_kata, last_synced_at),
+            )
+    finally:
+        connection.close()
+
+def get_codewars_profile(username):
+    """Return a saved Codewars profile, or None if it has not been synced."""
+    username = username.strip()
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute(
+            """
+            SELECT username, honor, overall_rank,
+                completed_kata, last_synced_at
+            FROM codewars_profiles
+            WHERE username = ?
+            """,
+            (username,),
+        ).fetchone()
     finally:
         connection.close()
