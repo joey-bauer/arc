@@ -9,11 +9,15 @@ from database import (
     get_active_session,
     get_completed_sessions,
     get_projects,
+    get_codewars_profile,
+    save_codewars_profile,
     update_project_next_step,
     initialize_database,
     start_session,
     stop_session,
 )
+
+from codewars_api import fetch_codewars_profile
 
 st.set_page_config(page_title="Arc", page_icon="⚡", layout="centered")
 
@@ -245,3 +249,70 @@ with st.container(border=True, key="resume_mission"):
                 else:
                     st.session_state["completion_message"] = "Next step saved."
                     st.rerun()
+
+with st.container(border=True, key="codewars"):
+    st.subheader("Codewars")
+    st.caption("Sync your public profile to track your kata progress.")
+
+    with st.form(key="codewars_sync_form"):
+        codewars_username = st.text_input(
+            "Codewars username",
+            key="codewars_username",
+        )
+        sync_codewars = st.form_submit_button("Sync Codewars")
+
+    if sync_codewars:
+        try:
+            with st.spinner("Syncing Codewars profile..."):
+                profile = fetch_codewars_profile(codewars_username)
+
+                honor = profile["honor"]
+                overall_rank = profile["ranks"]["overall"]["name"]
+                completed_kata = profile["codeChallenges"]["totalCompleted"]
+
+                if overall_rank is not None and not isinstance(overall_rank, str):
+                    raise ValueError("Codewars returned an unexpected rank.")
+
+                save_codewars_profile(
+                    username=codewars_username,
+                    honor=honor,
+                    overall_rank=overall_rank,
+                    completed_kata=completed_kata,
+                )
+        except (KeyError, TypeError):
+            st.warning("Codewars returned incomplete or unexpected profile data.")
+        except ValueError as error:
+            st.warning(str(error))
+        except sqlite3.Error:
+            st.error("Could not save your Codewars profile. Please try again.")
+        else:
+            st.success("Codewars profile synced.")
+
+    if codewars_username.strip():
+        try:
+            saved_profile = get_codewars_profile(codewars_username)
+        except sqlite3.Error:
+            st.error("Could Sync Codewars to save your profile.")
+        else: 
+            if saved_profile is None:
+                st.info("Click Sync Codewars to save your profile.")
+            else:
+                honor_column, rank_column, kata_column = st.columns(3)
+
+                honor_column.metric("Honor", saved_profile["honor"])
+                rank_column.metric(
+                    "Overall rank",
+                    saved_profile["overall_rank"] or "Unranked",
+                )
+                kata_column.metric(
+                    "Completed kata",
+                    saved_profile["completed_kata"],
+                )
+
+                last_synced = datetime.fromisoformat(
+                    saved_profile["last_synced_at"]
+                ).astimezone()
+                st.caption(
+                    f"Last successful sync: "
+                    f"{last_synced:%Y-%m-%d %H:%M:%S %Z}"
+                )
