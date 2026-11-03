@@ -10,6 +10,9 @@ from database import (
     get_completed_sessions,
     get_projects,
     get_codewars_profile,
+    get_last_codewars_username,
+    get_github_repository,
+    save_github_repository,
     save_codewars_profile,
     update_project_next_step,
     initialize_database,
@@ -18,6 +21,7 @@ from database import (
 )
 
 from codewars_api import fetch_codewars_profile
+from github_api import fetch_github_repository
 
 st.set_page_config(page_title="Arc", page_icon="⚡", layout="centered")
 
@@ -254,10 +258,17 @@ with st.container(border=True, key="codewars"):
     st.subheader("Codewars")
     st.caption("Sync your public profile to track your kata progress.")
 
+    try:
+        default_codewars_username = get_last_codewars_username()
+    except sqlite3.Error:
+        st.error("Could not load your saved Codewars username.")
+        default_codewars_username = ""
+
     with st.form(key="codewars_sync_form"):
         codewars_username = st.text_input(
             "Codewars username",
-            key="codewars_username",
+            value=default_codewars_username,
+            key="codewars_username"
         )
         sync_codewars = st.form_submit_button("Sync Codewars")
 
@@ -316,3 +327,87 @@ with st.container(border=True, key="codewars"):
                     f"Last successful sync: "
                     f"{last_synced:%Y-%m-%d %H:%M:%S %Z}"
                 )
+
+with st.container(border=True, key="github"):
+    st.subheader("GitHub")
+    st.caption("Connect a public repository to an Arc project.")
+
+    try:
+        github_projects = get_projects()
+    except sqlite3.Error:
+        st.error("Could not load projects. Please refresh to try again.")
+    else:
+        if not github_projects:
+            st.info("Add a project in Project Bays before syncing GitHub.")
+        else:
+            github_project_names = {
+                project["id"]: project["name"]
+                for project in github_projects
+            }
+
+            github_project_id = st.selectbox(
+                "Arc project",
+                options=list(github_project_names),
+                format_func=lambda project_id: github_project_names[project_id],
+                key="github_project",
+            )
+
+            with st.form(key=f"github_sync_form_{github_project_id}"):
+                github_owner = st.text_input(
+                    "GitHub owner",
+                    help="The username or organization that owns the repository.",
+                    key=f"github_owner_{github_project_id}",
+                )
+                github_repository_name = st.text_input(
+                    "Repository name",
+                    help="Enter the repository name, rather than its full URL.",
+                    key=f"github_repository_name_{github_project_id}",
+                )
+                sync_github = st.form_submit_button("Sync GitHub")
+
+            if sync_github:
+                try:
+                    with st.spinner("Syncing GitHub repository..."):
+                        repository = fetch_github_repository(github_owner, github_repository_name,)
+                        save_github_repository(github_project_id, repository,)
+                except ValueError as error:
+                    st.warning(str(error))
+                except sqlite3.Error:
+                    st.error("Could not save the repository. Please try again.")
+                else:
+                    st.success("GitHub repository synced.")
+
+            try:
+                saved_repository = get_github_repository(github_project_id)
+            except sqlite3.Error:
+                st.error("Could not load the saved repository.")
+            else:
+                if saved_repository is None:
+                    st.info("Sync a public repository to save its information.")
+                else:
+                    st.write(saved_repository["full_name"])
+                    st.link_button("Open Repository", saved_repository["html_url"],)
+                    st.write(saved_repository["description"] or "No description provided")
+                    st.caption(
+                        f"Main language: "
+                        f"{saved_repository['language'] or 'Not specified'}"
+                    )
+
+                    if saved_repository["pushed_at"]:
+                        last_pushed = datetime.fromisoformat(
+                            saved_repository["pushed_at"].replace("Z", "+00:00")
+                        ).astimezone()
+                        st.caption(
+                            f"Last repository push: "
+                            f"{last_pushed:%Y-%m-%d %H:%M:%S %Z}"
+                        )
+                    else:
+                        st.caption("Last repository push: Not available")
+
+                    github_last_synced = datetime.fromisoformat(
+                        saved_repository["last_synced_at"]
+                    ).astimezone()
+                    st.caption(
+                        f"Last successful sync: "
+                        f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
+                    )

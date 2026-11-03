@@ -68,6 +68,20 @@ def initialize_database():
                 )
             """)
 
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS github_repositories (
+                    project_id INTEGER PRIMARY KEY,
+                    github_id INTEGER NOT NULL,
+                    full_name TEXT NOT NULL,
+                    html_url TEXT NOT NULL,
+                    description TEXT,
+                    language TEXT,
+                    pushed_at TEXT,
+                    last_synced_at TEXT NOT NULL,
+                    FOREIGN KEY (project_id) REFERENCES projects(id)    
+                )
+            """)
+
     finally:
         connection.close()
 
@@ -289,3 +303,115 @@ def get_codewars_profile(username):
         ).fetchone()
     finally:
         connection.close()
+
+def get_last_codewars_username():
+    """Return the most recently synced username, or an empty string."""
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    try:
+        profile = connection.execute(
+            """
+            SELECT username
+            FROM codewars_profiles
+            ORDER BY last_synced_at DESC, username ASC
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if profile is None:
+            return ""
+
+        return profile[0]
+    finally:
+        connection.close()
+
+def save_github_repository(project_id, repository):
+    """Save fetched repository data with a UTC sync timestamp."""
+    if not isinstance(repository, dict):
+        raise ValueError("Expected GitHub repository data.")
+
+    github_id = repository.get("id")
+    full_name = repository.get("full_name")
+    html_url = repository.get("html_url")
+
+    if type(github_id) is not int or github_id <= 0:
+        raise ValueError("GitHub returned an invalid repository ID.")
+
+    if not isinstance(full_name, str) or not full_name.strip():
+        raise ValueError("GitHub returned an invalid repository name.")
+
+    if not isinstance(html_url, str) or not html_url.startswith("https://github.com/"):
+        raise ValueError("GitHub returned an invalid repository URL.")
+
+    optional_fields = ("description", "language", "pushed_at")
+    for field in optional_fields:
+        value = repository.get(field)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"GitHub returned an unexpected {field}.")
+
+    last_synced_at = datetime.now(timezone.utc).isoformat()
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    try:
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+
+            project = connection.execute(
+                "SELECT id FROM projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+
+            if project is None:
+                raise ValueError("Choose an existing project.")
+
+            connection.execute(
+                """
+                INSERT INTO github_repositories (
+                    project_id, github_id, full_name, html_url,
+                    description, language, pushed_at, last_synced_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    github_id = excluded.github_id,
+                    full_name = excluded.full_name,
+                    html_url = excluded.html_url,
+                    description = excluded.description,
+                    language = excluded.language,
+                    pushed_at = excluded.pushed_at,
+                    last_synced_at = excluded.last_synced_at
+                """,
+                (
+                    project_id,
+                    github_id,
+                    full_name.strip(),
+                    html_url,
+                    repository.get("description"),
+                    repository.get("language"),
+                    repository.get("pushed_at"),
+                    last_synced_at,
+                ),
+            )
+    finally:
+        connection.close()
+
+
+def get_github_repository(project_id):
+    """Return a project's saved repository, or None if none is saved."""
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute(
+            """
+            SELECT project_id, github_id, full_name, html_url,
+                   description, language, pushed_at, last_synced_at
+            FROM github_repositories
+            WHERE project_id = ?
+            """,
+            (project_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+
