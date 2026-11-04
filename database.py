@@ -415,3 +415,68 @@ def get_github_repository(project_id):
     finally:
         connection.close()
 
+def get_session_summary(start_at, end_at):
+    """Summarize completed sessions started within a UTC date range."""
+    if start_at.tzinfo is None or end_at.tzinfo is None:
+        raise ValueError("Summary dates must include a timezone.")
+
+    start_utc = start_at.astimezone(timezone.utc)
+    end_utc = end_at.astimezone(timezone.utc)
+
+    if start_utc >= end_utc:
+        raise ValueError("The start must be before the end.")
+
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute(
+            """
+            SELECT
+                COUNT(*) AS session_count,
+                COALESCE(SUM(duration_seconds), 0) AS total_seconds
+            FROM sessions
+            WHERE ended_at IS NOT NULL
+                AND started_at >= ?
+                AND started_at < ?
+            """,
+            (start_utc.isoformat(), end_utc.isoformat()),
+        ).fetchone()
+    finally:
+        connection.close()
+
+def get_project_session_summary(start_at, end_at):
+    """Summarize completed sessions by project within a UTC date range."""
+    if start_at.tzinfo is None or end_at.tzinfo is None:
+        raise ValueError("Summary dates must include a timezone.")
+
+    start_utc = start_at.astimezone(timezone.utc)
+    end_utc = end_at.astimezone(timezone.utc)
+
+    if start_utc >= end_utc:
+        raise ValueError("The start must be before the end.")
+
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    try:
+        return connection.execute(
+            """
+            SELECT
+                sessions.project_id,
+                COALESCE(projects.name, 'Unassigned') AS project_name,
+                COUNT(*) AS session_count,
+                SUM(sessions.duration_seconds) AS total_seconds
+            FROM sessions
+            LEFT JOIN projects ON sessions.project_id = projects.id
+            WHERE sessions.ended_at IS NOT NULL
+                AND sessions.started_at >= ?
+                AND sessions.started_at < ?
+            GROUP BY sessions.project_id, projects.name
+            ORDER BY total_seconds DESC, project_name ASC,
+                    sessions.project_id ASC
+            """,
+            (start_utc.isoformat(), end_utc.isoformat()),
+        ).fetchall()
+    finally:
+        connection.close()

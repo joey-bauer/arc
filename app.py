@@ -1,6 +1,6 @@
 from pathlib import Path
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import streamlit as st
 
@@ -12,6 +12,7 @@ from database import (
     get_codewars_profile,
     get_last_codewars_username,
     get_github_repository,
+    get_session_summary,
     save_github_repository,
     save_codewars_profile,
     update_project_next_step,
@@ -411,3 +412,54 @@ with st.container(border=True, key="github"):
                         f"Last successful sync: "
                         f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
                     )
+
+with st.container(border=True, key="weekly_debrief"):
+    st.subheader("Weekly Debrief")
+
+    today = datetime.now().astimezone().date()
+    monday = today - timedelta(days=today.weekday())
+    next_monday = monday + timedelta(days=7)
+    sunday = next_monday - timedelta(days=1)
+
+    # Convert each local midnight separately to respect timezone changes.
+    week_start = datetime.combine(
+        monday, datetime.min.time()
+    ).astimezone()
+    week_end = datetime.combine(
+        next_monday, datetime.min.time()
+    ).astimezone()
+
+    st.caption(
+        f"{monday:%b %d, %Y} - {sunday:%b %d, %Y} "
+        "(local time)"
+    )
+
+    try:
+        summary = get_session_summary(week_start, week_end)
+    except sqlite3.Error:
+        st.error("Could not load the weekly summary. Please try again.")
+    else:
+        hours, remainder = divmod(summary["total_seconds"], 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        sessions_column, time_column = st.columns(2)
+
+        sessions_column.metric(
+            "Completed sessions",
+            summary["session_count"],
+        )
+        time_column.metric(
+            "Coding time",
+            f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+        )
+
+        st.caption(
+            "Coding time is shown as HH:MM:SS. "
+            "Completed sessions count toward the week they started."
+        )
+
+        if summary["session_count"] == 0:
+            st.info(
+                "No completed sessions this week. "
+                "Start and finish a coding session to see your progress."
+            )
