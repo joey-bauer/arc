@@ -1,12 +1,130 @@
+:root {
+    --arc-font: "Cascadia Code", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    --arc-background: #080f17;
+    --arc-panel: #101c28;
+    --arc-accent: #a5f3ef;
+    --arc-text: #e6edf3;
+    --arc-muted: #91a8b8;
+    --arc-border: rgba(94, 234, 212, 0.22);
+}
+
+/* A faint grid adds structure without competing with the content. */
 .stApp {
-    background-color: #0b1118;
-    color: #e6edf3;
+    background-color: var(--arc-background);
+    background-image:
+        linear-gradient(rgba(94, 234, 212, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(94, 234, 212, 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    color: var(--arc-text);
+    font-family: var(--arc-font);
+}
+
+/* Target text elements explicitly so Streamlit's icon fonts keep working. */
+.stApp :is(h1, h2, h3, h4, h5, h6, p, label, input, textarea, button, a, code, pre, th, td),
+.stApp [data-baseweb="select"],
+.stApp [data-baseweb="select"] input,
+.stApp [data-testid="stMetricValue"],
+[data-baseweb="popover"] [role="option"] {
+    font-family: var(--arc-font);
 }
 
 h1, h2, h3 {
-    color: #e6edf3;
+    color: var(--arc-text);
 }
 
+.stApp :is(h2, h3, h4) {
+    color: var(--arc-accent);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-shadow: 0 0 18px rgba(94, 234, 212, 0.1);
+}
+
+.stApp [data-testid="stWidgetLabel"] p,
+.stApp [data-testid="stMetricLabel"] p {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.stApp [data-testid="stCaptionContainer"] p {
+    color: var(--arc-muted);
+    line-height: 1.6;
+}
+
+/* Match field values and dropdown options without changing entered case. */
+.stApp :is(input, textarea),
+.stApp [data-baseweb="select"] div,
+[data-baseweb="popover"] [role="option"],
+[data-baseweb="popover"] [role="option"] div {
+    font-family: var(--arc-font);
+    font-size: 0.9rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+}
+
+.stApp :is(input, textarea)::placeholder {
+    font-family: var(--arc-font);
+    color: var(--arc-muted);
+    opacity: 1;
+}
+
+.stApp button p,
+.stApp [data-testid="stLinkButton"] a p {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.stApp [data-testid="stMetricValue"] {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+/* Command center header. */
+.arc-header {
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--arc-border);
+}
+
+.arc-eyebrow {
+    color: var(--arc-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+}
+
+.arc-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0.35rem 0;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-shadow: 0 0 24px rgba(94, 234, 212, 0.15);
+}
+
+.arc-header-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--arc-accent);
+    box-shadow: 0 0 12px rgba(94, 234, 212, 0.5);
+}
+
+.arc-header p {
+    margin: 0;
+    color: var(--arc-muted);
+    font-size: 0.9rem;
+}
+
+/* Dashboard panels. */
 .st-key-coding_timer,
 .st-key-session_log,
 .st-key-project_bays,
@@ -14,18 +132,95 @@ h1, h2, h3 {
 .st-key-codewars,
 .st-key-github,
 .st-key-weekly_debrief {
-    background-color: #121d28;
-    border: 1px solid #294451;
+    background-color: var(--arc-panel);
+    border: 2px solid rgba(165, 243, 239, 0.5);
     border-radius: 12px;
     padding: 1.5rem;
+    box-sizing: border-box;
+    transition: transform 160ms ease;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.16),
+        0 0 12px rgba(165, 243, 239, 0.2),
+        0 0 32px rgba(165, 243, 239, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
-.st-key-session_log {
-    min-height: 420px;
-    box-sizing: border-box;
+/* Scale visually without changing the grid's dimensions or scroll areas. */
+@media (hover: hover) and (pointer: fine) {
+    :is(
+        .st-key-coding_timer,
+        .st-key-session_log,
+        .st-key-project_bays,
+        .st-key-project_notes,
+        .st-key-codewars,
+        .st-key-github,
+        .st-key-weekly_debrief
+    ):hover {
+        transform: scale(1.006);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :is(
+        .st-key-coding_timer,
+        .st-key-session_log,
+        .st-key-project_bays,
+        .st-key-project_notes,
+        .st-key-codewars,
+        .st-key-github,
+        .st-key-weekly_debrief
+    ) {
+        transition: none;
+        transform: none;
+    }
+}
+
+/* Give the central session panel a little more emphasis. */
+.st-key-coding_timer {
+    background-image: linear-gradient(
+        135deg,
+        rgba(94, 234, 212, 0.04),
+        transparent 60%
+    );
 }
 
 .st-key-coding_timer [data-testid="stMetricValue"] {
-    color: #5eead4;
+    color: var(--arc-accent);
     font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px rgba(94, 234, 212, 0.2);
+}
+
+/* Keep the Notes field outlined even when it is not focused. */
+.st-key-project_notes textarea {
+    outline: 1px solid var(--arc-accent) !important;
+    outline-offset: -1px;
+    border-radius: 6px;
+}
+
+/* Preserve a distinct keyboard-focus cue around the persistent outline. */
+.st-key-project_notes textarea:focus-visible {
+    outline-width: 2px !important;
+}
+
+/* Scope the red treatment to Start so other actions keep their theme. */
+.st-key-start_session button {
+    color: #fff1f2;
+    background: linear-gradient(135deg, #9f1239, #be123c);
+    border: 1px solid #fb7185;
+    border-radius: 6px;
+    box-shadow:
+        0 0 16px rgba(244, 63, 94, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.st-key-start_session button:hover {
+    color: #ffffff;
+    background: linear-gradient(135deg, #be123c, #9f1239);
+    border-color: #fda4af;
+    box-shadow: 0 0 22px rgba(244, 63, 94, 0.3);
+}
+
+.st-key-start_session button:focus-visible {
+    outline: 2px solid #fda4af;
+    outline-offset: 3px;
 }

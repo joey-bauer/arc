@@ -30,7 +30,13 @@ st.set_page_config(page_title="Arc", page_icon="⚡", layout="wide")
 styles_path = Path(__file__).resolve().parent / "styles.css"
 st.html(styles_path)
 
-st.title("Arc")
+st.html("""
+    <div class="arc-header">
+        <div class="arc-eyebrow">PERSONAL COMMAND CENTER</div>
+        <h1>ARC<span class="arc-header-dot" aria-hidden="true"></span></h1>
+        <p>Projects. Progress. Purpose.</p>
+    </div>
+""")
 
 try:
     initialize_database()
@@ -68,7 +74,7 @@ resume_column, coding_column, progress_column = st.columns(
 projects_column, sessions_column = st.columns(2, gap="medium")
 github_column, codewars_column = st.columns(2, gap="medium")
 
-with coding_column, st.container(border=True, key="coding_timer"):
+with coding_column, st.container(border=True, key="coding_timer", height=460):
     st.subheader("Coding Session")
 
     if active_session is None:
@@ -153,7 +159,7 @@ with coding_column, st.container(border=True, key="coding_timer"):
 
 
 with sessions_column, st.container(
-    border=True, key="session_log"
+    border=True, key="session_log", height=420
 ):
     st.subheader("Session Log")
     st.caption("Your 14 most recent completed sessions. Start times are local.")
@@ -174,19 +180,22 @@ with sessions_column, st.container(
                 minutes, seconds = divmod(remainder, 60)
                 session_rows.append({
                     "Project": session["project_name"] or "Unassigned",
-                    "Started": local_start.strftime("%Y-%m-%d %H:%M:%S %Z"),
-                    "Duration (HH:MM:SS)": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+                    "Started": local_start.strftime("%Y-%m-%d %H:%M:%S"),
+                    "Duration": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
                 })
 
             st.dataframe(
                 session_rows,
                 hide_index=True,
                 width="stretch",
-                height=280,
+                height=250,
+                column_config={
+                    "Started": st.column_config.TextColumn(width=170),
+                },
             )
 
-with projects_column, st.container(
-    border=True, key="project_bays", height=420
+with progress_column, st.container(
+    border=True, key="project_bays", height=460
 ):
     st.subheader("Project Bays")
 
@@ -228,7 +237,7 @@ with projects_column, st.container(
             st.session_state["completion_message"] = "Project saved."
             st.rerun()
 
-with resume_column, st.container(border=True, key="project_notes"):
+with resume_column, st.container(border=True, key="project_notes", height=460):
     st.subheader("Project Notes")
     st.caption("Leave yourself a next step for each project.")
 
@@ -256,7 +265,7 @@ with resume_column, st.container(border=True, key="project_notes"):
 
             with st.form(key=f"next_step_form_{resume_project_id}"):
                 next_step = st.text_area(
-                    "Where will you pick up next time?",
+                    "Notes:",
                     value=selected_project["next_step"],
                     key=f"next_step_{resume_project_id}",
                 )
@@ -450,7 +459,7 @@ with github_column, st.container(border=True, key="github"):
                         f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
                     )
 
-with progress_column, st.container(border=True, key="weekly_debrief"):
+with projects_column, st.container(border=True, key="weekly_debrief", height=420):
     st.subheader("Weekly Progress")
 
     today = datetime.now().astimezone().date()

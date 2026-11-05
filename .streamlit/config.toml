@@ -1,0 +1,12 @@
+# Native widgets and canvas-rendered tables cannot inherit every CSS rule.
+# Keep this palette and font stack aligned with styles.css.
+[theme]
+base = "dark"
+primaryColor = "#a5f3ef"
+backgroundColor = "#080f17"
+secondaryBackgroundColor = "#101c28"
+textColor = "#e6edf3"
+font = "'Cascadia Code', 'Cascadia Mono', Consolas, 'Liberation Mono', monospace"
+dataframeBorderColor = "#294451"
+dataframeHeaderBackgroundColor = "#142735"
+dataframeHeaderTextColor = "#a5f3ef"
