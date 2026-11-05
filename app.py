@@ -13,6 +13,7 @@ from database import (
     get_last_codewars_username,
     get_github_repository,
     get_session_summary,
+    get_project_session_summary,
     save_github_repository,
     save_codewars_profile,
     update_project_next_step,
@@ -24,7 +25,7 @@ from database import (
 from codewars_api import fetch_codewars_profile
 from github_api import fetch_github_repository
 
-st.set_page_config(page_title="Arc", page_icon="⚡", layout="centered")
+st.set_page_config(page_title="Arc", page_icon="⚡", layout="wide")
 
 styles_path = Path(__file__).resolve().parent / "styles.css"
 st.html(styles_path)
@@ -59,7 +60,15 @@ def render_elapsed_timer(started_at_iso):
         f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     )
 
-with st.container(border=True, key="coding_timer"):
+resume_column, coding_column, progress_column = st.columns(
+    [1, 1.5, 1],
+    gap="medium",
+)
+
+projects_column, sessions_column = st.columns(2, gap="medium")
+github_column, codewars_column = st.columns(2, gap="medium")
+
+with coding_column, st.container(border=True, key="coding_timer"):
     st.subheader("Coding Session")
 
     if active_session is None:
@@ -143,9 +152,11 @@ with st.container(border=True, key="coding_timer"):
                 st.rerun()
 
 
-with st.container(border=True, key="session_log"):
+with sessions_column, st.container(
+    border=True, key="session_log"
+):
     st.subheader("Session Log")
-    st.caption("Your ten most recent completed sessions. Start times are local.")
+    st.caption("Your 14 most recent completed sessions. Start times are local.")
 
     try:
         completed_sessions = get_completed_sessions()
@@ -167,10 +178,37 @@ with st.container(border=True, key="session_log"):
                     "Duration (HH:MM:SS)": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
                 })
 
-            st.dataframe(session_rows, hide_index=True, width="stretch")
+            st.dataframe(
+                session_rows,
+                hide_index=True,
+                width="stretch",
+                height=280,
+            )
 
-with st.container(border=True, key="project_bays"):
+with projects_column, st.container(
+    border=True, key="project_bays", height=420
+):
     st.subheader("Project Bays")
+
+    try:
+        projects = get_projects()
+    except sqlite3.Error:
+        st.error("Could not load projects. Please refresh to try again.")
+    else:
+        if not projects:
+            st.info("No projects yet. Add your first project below.")
+        else:
+            project_rows = []
+            for project in projects:
+                project_rows.append({
+                    "Project": project["name"],
+                })
+
+            st.dataframe(
+                project_rows,
+                hide_index=True,
+                width="stretch",
+            )
 
     with st.form(key="add_project_form"):
         project_name = st.text_input(
@@ -187,30 +225,11 @@ with st.container(border=True, key="project_bays"):
         except sqlite3.Error:
             st.error("Could not save the project. Please try again.")
         else:
-            st.success("Project saved.")
+            st.session_state["completion_message"] = "Project saved."
+            st.rerun()
 
-    try:
-        projects = get_projects()
-    except sqlite3.Error:
-        st.error("Could not load projects. Please refresh to try again.")
-    else:
-        if not projects:
-            st.info("No projects yet. Add your first project above.")
-        else:
-            project_rows = []
-            for project in projects:
-                project_rows.append({
-                    "Project": project["name"],
-                })
-
-            st.dataframe(
-                project_rows,
-                hide_index=True,
-                width="stretch",
-            )
-
-with st.container(border=True, key="resume_mission"):
-    st.subheader("Resume Mission")
+with resume_column, st.container(border=True, key="project_notes"):
+    st.subheader("Project Notes")
     st.caption("Leave yourself a next step for each project.")
 
     try:
@@ -242,7 +261,7 @@ with st.container(border=True, key="resume_mission"):
                     key=f"next_step_{resume_project_id}",
                 )
 
-                save_next_step = st.form_submit_button("Save Next Step")
+                save_next_step = st.form_submit_button("Save")
 
             if save_next_step:
                 try:
@@ -255,7 +274,7 @@ with st.container(border=True, key="resume_mission"):
                     st.session_state["completion_message"] = "Next step saved."
                     st.rerun()
 
-with st.container(border=True, key="codewars"):
+with codewars_column, st.container(border=True, key="codewars"):
     st.subheader("Codewars")
     st.caption("Sync your public profile to track your kata progress.")
 
@@ -329,7 +348,7 @@ with st.container(border=True, key="codewars"):
                     f"{last_synced:%Y-%m-%d %H:%M:%S %Z}"
                 )
 
-with st.container(border=True, key="github"):
+with github_column, st.container(border=True, key="github"):
     st.subheader("GitHub")
     st.caption("Connect a public repository to an Arc project.")
 
@@ -353,14 +372,32 @@ with st.container(border=True, key="github"):
                 key="github_project",
             )
 
+            try:
+                connected_repository = get_github_repository(
+                    github_project_id
+                )
+            except sqlite3.Error:
+                st.error("Could not load the saved repository.")
+                connected_repository = None
+
+            default_owner = ""
+            default_repository_name = ""
+
+            if connected_repository is not None:
+                default_owner, default_repository_name = (
+                    connected_repository["full_name"].split("/", 1)
+                )
+
             with st.form(key=f"github_sync_form_{github_project_id}"):
                 github_owner = st.text_input(
                     "GitHub owner",
+                    value=default_owner,
                     help="The username or organization that owns the repository.",
                     key=f"github_owner_{github_project_id}",
                 )
                 github_repository_name = st.text_input(
                     "Repository name",
+                    value=default_repository_name,
                     help="Enter the repository name, rather than its full URL.",
                     key=f"github_repository_name_{github_project_id}",
                 )
@@ -413,8 +450,8 @@ with st.container(border=True, key="github"):
                         f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
                     )
 
-with st.container(border=True, key="weekly_debrief"):
-    st.subheader("Weekly Debrief")
+with progress_column, st.container(border=True, key="weekly_debrief"):
+    st.subheader("Weekly Progress")
 
     today = datetime.now().astimezone().date()
     monday = today - timedelta(days=today.weekday())
@@ -442,13 +479,13 @@ with st.container(border=True, key="weekly_debrief"):
         hours, remainder = divmod(summary["total_seconds"], 3600)
         minutes, seconds = divmod(remainder, 60)
 
-        sessions_column, time_column = st.columns(2)
+        session_count_column, coding_time_column = st.columns(2)
 
-        sessions_column.metric(
+        session_count_column.metric(
             "Completed sessions",
             summary["session_count"],
         )
-        time_column.metric(
+        coding_time_column.metric(
             "Coding time",
             f"{hours:02d}:{minutes:02d}:{seconds:02d}",
         )
@@ -463,3 +500,33 @@ with st.container(border=True, key="weekly_debrief"):
                 "No completed sessions this week. "
                 "Start and finish a coding session to see your progress."
             )
+
+        else:
+            try:
+                project_summary = get_project_session_summary(
+                    week_start, week_end
+                )
+            except sqlite3.Error:
+                st.error("Could not load the project breakdown.")
+            else:
+                project_rows = []
+
+                for project in project_summary:
+                    hours, remainder = divmod(
+                        project["total_seconds"], 3600
+                    )
+                    minutes, seconds = divmod(remainder, 60)
+
+                    project_rows.append({
+                        "Project": project["project_name"],
+                        "Completed sessions": project["session_count"],
+                        "Coding time (HH:MM:SS)": (
+                            f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                        ),
+                    })
+
+                st.dataframe(
+                    project_rows,
+                    hide_index=True,
+                    width="stretch",
+                )

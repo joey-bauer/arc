@@ -158,7 +158,7 @@ def get_active_session():
 
 
 def get_completed_sessions():
-    """Return the ten most recently started completed sessions with project names."""
+    """Return the 14 most recently started completed sessions with project names."""
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
 
@@ -174,7 +174,7 @@ def get_completed_sessions():
             LEFT JOIN projects ON sessions.project_id = projects.id
             WHERE sessions.ended_at IS NOT NULL
             ORDER BY sessions.started_at DESC, sessions.id DESC
-            LIMIT 10
+            LIMIT 14
         """).fetchall()
     finally:
         connection.close()

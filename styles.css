@@ -7,11 +7,22 @@ h1, h2, h3 {
     color: #e6edf3;
 }
 
-.st-key-coding_timer {
+.st-key-coding_timer,
+.st-key-session_log,
+.st-key-project_bays,
+.st-key-project_notes,
+.st-key-codewars,
+.st-key-github,
+.st-key-weekly_debrief {
     background-color: #121d28;
     border: 1px solid #294451;
     border-radius: 12px;
     padding: 1.5rem;
+}
+
+.st-key-session_log {
+    min-height: 420px;
+    box-sizing: border-box;
 }
 
 .st-key-coding_timer [data-testid="stMetricValue"] {
