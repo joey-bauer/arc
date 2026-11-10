@@ -32,9 +32,7 @@ st.html(styles_path)
 
 st.html("""
     <div class="arc-header">
-        <div class="arc-eyebrow">PERSONAL COMMAND CENTER</div>
         <h1>ARC<span class="arc-header-dot" aria-hidden="true"></span></h1>
-        <p>Projects. Progress. Purpose.</p>
     </div>
 """)
 

@@ -191,14 +191,23 @@ h1, h2, h3 {
 }
 
 /* Keep the Notes field outlined even when it is not focused. */
-.st-key-project_notes textarea {
+.st-key-project_notes textarea,
+.st-key-codewars input,
+.st-key-project_bays input {
     outline: 1px solid var(--arc-accent) !important;
     outline-offset: -1px;
     border-radius: 6px;
 }
 
+.st-key-codewars input,
+.st-key-project_bays input {
+    outline-color: #607080 !important;
+}
+
 /* Preserve a distinct keyboard-focus cue around the persistent outline. */
-.st-key-project_notes textarea:focus-visible {
+.st-key-project_notes textarea:focus-visible,
+.st-key-codewars input:focus-visible,
+.st-key-project_bays input:focus-visible {
     outline-width: 2px !important;
 }
 
