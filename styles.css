@@ -190,29 +190,57 @@ h1, h2, h3 {
     text-shadow: 0 0 18px rgba(94, 234, 212, 0.2);
 }
 
-/* Keep the Notes field outlined even when it is not focused. */
+/* Outline the fields directly; a thicker stroke keeps corners visible. */
 .st-key-project_notes textarea,
 .st-key-codewars input,
+.st-key-github input,
 .st-key-project_bays input {
-    outline: 1px solid var(--arc-accent) !important;
-    outline-offset: -1px;
+    outline: 2px solid var(--arc-accent) !important;
+    outline-offset: -2px;
     border-radius: 6px;
 }
 
+.st-key-project_notes textarea,
 .st-key-codewars input,
+.st-key-github input,
 .st-key-project_bays input {
     outline-color: #607080 !important;
 }
 
-/* Preserve a distinct keyboard-focus cue around the persistent outline. */
+/* Highlight focus without changing the field's dimensions. */
 .st-key-project_notes textarea:focus-visible,
 .st-key-codewars input:focus-visible,
+.st-key-github input:focus-visible,
 .st-key-project_bays input:focus-visible {
-    outline-width: 2px !important;
+    outline-color: var(--arc-accent) !important;
+    box-shadow: 0 0 0 2px var(--arc-background), 0 0 0 4px var(--arc-accent);
 }
 
-/* Scope the red treatment to Start so other actions keep their theme. */
+/* Emerald green marks the action that starts a coding session. */
 .st-key-start_session button {
+    color: #ecfdf5;
+    background: linear-gradient(135deg, #065f46, #047857);
+    border: 1px solid #34d399;
+    border-radius: 6px;
+    box-shadow:
+        0 0 16px rgba(52, 211, 153, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.st-key-start_session button:hover {
+    color: #ffffff;
+    background: linear-gradient(135deg, #047857, #065f46);
+    border-color: #6ee7b7;
+    box-shadow: 0 0 22px rgba(52, 211, 153, 0.3);
+}
+
+.st-key-start_session button:focus-visible {
+    outline: 2px solid #6ee7b7;
+    outline-offset: 3px;
+}
+
+/* Keep the original red treatment for stopping an active session. */
+.st-key-stop_session button {
     color: #fff1f2;
     background: linear-gradient(135deg, #9f1239, #be123c);
     border: 1px solid #fb7185;
@@ -222,14 +250,14 @@ h1, h2, h3 {
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.st-key-start_session button:hover {
+.st-key-stop_session button:hover {
     color: #ffffff;
     background: linear-gradient(135deg, #be123c, #9f1239);
     border-color: #fda4af;
     box-shadow: 0 0 22px rgba(244, 63, 94, 0.3);
 }
 
-.st-key-start_session button:focus-visible {
+.st-key-stop_session button:focus-visible {
     outline: 2px solid #fda4af;
     outline-offset: 3px;
 }
