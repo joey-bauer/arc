@@ -207,6 +207,15 @@ h1, h2, h3 {
     outline-color: #607080 !important;
 }
 
+/* Hide the form shortcut hint while leaving character counts visible. */
+[data-testid="stForm"] [data-testid="InputInstructions"] > span:first-child {
+    display: none;
+}
+
+[data-testid="stForm"] [data-testid="InputInstructions"] > span:nth-child(2)::before {
+    content: none;
+}
+
 /* Highlight focus without changing the field's dimensions. */
 .st-key-project_notes textarea:focus-visible,
 .st-key-codewars input:focus-visible,
