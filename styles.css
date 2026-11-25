@@ -195,16 +195,20 @@ h1, h2, h3 {
 .st-key-codewars input,
 .st-key-github input,
 .st-key-project_bays input {
-    outline: 2px solid var(--arc-accent) !important;
+    outline: 2px solid #607080 !important;
     outline-offset: -2px;
     border-radius: 6px;
 }
 
-.st-key-project_notes textarea,
-.st-key-codewars input,
-.st-key-github input,
-.st-key-project_bays input {
-    outline-color: #607080 !important;
+/* Draw the dropdown frame around the whole control in every state. */
+.st-key-coding_timer [data-testid="stSelectbox"] [role="group"] {
+    border: 2px solid #607080;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.st-key-coding_timer [data-testid="stSelectbox"] [role="group"][data-focus-within] {
+    border-color: var(--arc-accent);
 }
 
 /* Hide the form shortcut hint while leaving character counts visible. */

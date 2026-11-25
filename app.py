@@ -72,6 +72,14 @@ resume_column, coding_column, progress_column = st.columns(
 projects_column, sessions_column = st.columns(2, gap="medium")
 github_column, codewars_column = st.columns(2, gap="medium")
 
+try:
+    projects_by_id = {project["id"]: project for project in get_projects()}
+except sqlite3.Error:
+    projects_by_id = {}
+    st.error("Could not load projects. Please refresh to try again.")
+
+selected_project_id = None
+
 with coding_column, st.container(border=True, key="coding_timer", height=460):
     st.subheader("Coding Session")
 
@@ -79,56 +87,52 @@ with coding_column, st.container(border=True, key="coding_timer", height=460):
         st.metric("Elapsed Time", "00:00:00")
         st.caption("No coding session active.")
 
-        try:
-            projects = get_projects()
-        except sqlite3.Error:
-            st.error("Could not load projects. Please refresh to try again.")
-        else:
-            if not projects:
-                st.info("Add a project in Project Bays before starting a session.")
+        if projects_by_id:
+            project_ids = list(projects_by_id)
+            previous_project_id = st.session_state.get("selected_project_id")
+            default_index = (
+                project_ids.index(previous_project_id)
+                if previous_project_id in projects_by_id
+                else 0
+            )
+            selected_project_id = st.selectbox(
+                "Project",
+                options=project_ids,
+                index=default_index,
+                format_func=lambda project_id: projects_by_id[project_id]["name"],
+                key="session_project",
+            )
+            st.session_state["selected_project_id"] = selected_project_id
+            selected_project = projects_by_id[selected_project_id]
+
+            if selected_project["next_step"]:
+                st.info(selected_project["next_step"])
             else:
-                project_names = {
-                    project["id"]: project["name"]
-                    for project in projects
-                }
+                st.caption("No next step saved for this project yet.")
 
-                selected_project_id = st.selectbox(
-                    "Project",
-                    options=list(project_names),
-                    format_func=lambda project_id: project_names[project_id],
-                    key="session_project"
-                )
-
-                selected_session_project = next(
-                    project
-                    for project in projects
-                    if project["id"] == selected_project_id
-                )
-
-                if selected_session_project["next_step"]:
-                    st.info(selected_session_project["next_step"])
+            if st.button(
+                "Start Coding Session",
+                key="start_session",
+                type="primary",
+            ):
+                try:
+                    start_session(selected_project_id)
+                except ValueError as error:
+                    st.warning(str(error))
+                except sqlite3.IntegrityError:
+                    st.warning(
+                        "A session is already active. Refresh to see it."
+                    )
+                except sqlite3.Error:
+                    st.error("Could not start the session. Please try again.")
                 else:
-                    st.caption("No next step saved for this project yet.")
+                    st.rerun()
 
-                if st.button(
-                    "Start Coding Session",
-                    key="start_session",
-                    type="primary",
-                ):
-                    try:
-                        start_session(selected_project_id)
-                    except ValueError as error:
-                        st.warning(str(error))
-                    except sqlite3.IntegrityError:
-                        st.warning(
-                            "A session is already active. Refresh to see it."
-                        )
-                    except sqlite3.Error:
-                        st.error("Could not start the session. Please try again.")
-                    else:
-                        st.rerun()
+        else:
+            st.info("Add a project in Project Bays before starting a session.")
 
     else:
+        selected_project_id = active_session["project_id"]
         render_elapsed_timer(active_session["started_at"])
         project_name = active_session["project_name"] or "Unassigned"
         st.caption(f"Coding session active: {project_name}")
@@ -155,6 +159,8 @@ with coding_column, st.container(border=True, key="coding_timer", height=460):
                 )
                 st.rerun()
 
+
+selected_project = projects_by_id.get(selected_project_id)
 
 with sessions_column, st.container(
     border=True, key="session_log", height=420
@@ -197,25 +203,14 @@ with progress_column, st.container(
 ):
     st.subheader("Project Bays")
 
-    try:
-        projects = get_projects()
-    except sqlite3.Error:
-        st.error("Could not load projects. Please refresh to try again.")
+    if selected_project is None:
+        st.info("No project selected. Add a project below to get started.")
     else:
-        if not projects:
-            st.info("No projects yet. Add your first project below.")
-        else:
-            project_rows = []
-            for project in projects:
-                project_rows.append({
-                    "Project": project["name"],
-                })
-
-            st.dataframe(
-                project_rows,
-                hide_index=True,
-                width="stretch",
-            )
+        st.dataframe(
+            [{"Project": selected_project["name"]}],
+            hide_index=True,
+            width="stretch",
+        )
 
     with st.form(key="add_project_form"):
         project_name = st.text_input(
@@ -239,47 +234,31 @@ with resume_column, st.container(border=True, key="project_notes", height=460):
     st.subheader("Project Notes")
     st.caption("Leave yourself a next step for each project.")
 
-    try:
-        resume_projects = get_projects()
-    except sqlite3.Error:
-        st.error("Could not load projects. Please refresh to try again.")
+    if selected_project is None:
+        st.info("Add a project in Project Bays to leave a next step.")
     else:
-        if not resume_projects:
-            st.info("Add a project in Project Bays to leave a next step.")
-        else:
-            projects_by_id = {
-                project["id"]: project
-                for project in resume_projects
-            }
+        st.write(selected_project["name"])
 
-            resume_project_id = st.selectbox(
-                "Project",
-                options=list(projects_by_id),
-                format_func=lambda project_id: projects_by_id[project_id]["name"],
-                key="resume_project",
+        with st.form(key=f"next_step_form_{selected_project_id}"):
+            next_step = st.text_area(
+                "Notes:",
+                value=selected_project["next_step"],
+                key=f"next_step_{selected_project_id}",
             )
 
-            selected_project = projects_by_id[resume_project_id]
+            save_next_step = st.form_submit_button("Save")
 
-            with st.form(key=f"next_step_form_{resume_project_id}"):
-                next_step = st.text_area(
-                    "Notes:",
-                    value=selected_project["next_step"],
-                    key=f"next_step_{resume_project_id}",
-                )
+        if save_next_step:
+            try:
+                update_project_next_step(selected_project_id, next_step)
+            except ValueError as error:
+                st.warning(str(error))
+            except sqlite3.Error:
+                st.error("Could not save the next step. Please try again.")
+            else:
+                st.session_state["completion_message"] = "Next step saved."
+                st.rerun()
 
-                save_next_step = st.form_submit_button("Save")
-
-            if save_next_step:
-                try:
-                    update_project_next_step(resume_project_id, next_step)
-                except ValueError as error:
-                    st.warning(str(error))
-                except sqlite3.Error:
-                    st.error("Could not save the next step. Please try again.")
-                else:
-                    st.session_state["completion_message"] = "Next step saved."
-                    st.rerun()
 
 with codewars_column, st.container(border=True, key="codewars"):
     st.subheader("Codewars")
@@ -359,103 +338,89 @@ with github_column, st.container(border=True, key="github"):
     st.subheader("GitHub")
     st.caption("Connect a public repository to an Arc project.")
 
-    try:
-        github_projects = get_projects()
-    except sqlite3.Error:
-        st.error("Could not load projects. Please refresh to try again.")
+    if selected_project is None:
+        st.info("Add a project in Project Bays before syncing GitHub.")
     else:
-        if not github_projects:
-            st.info("Add a project in Project Bays before syncing GitHub.")
-        else:
-            github_project_names = {
-                project["id"]: project["name"]
-                for project in github_projects
-            }
+        st.write(selected_project["name"])
 
-            github_project_id = st.selectbox(
-                "Arc project",
-                options=list(github_project_names),
-                format_func=lambda project_id: github_project_names[project_id],
-                key="github_project",
+        try:
+            connected_repository = get_github_repository(
+                selected_project_id
+            )
+        except sqlite3.Error:
+            st.error("Could not load the saved repository.")
+            connected_repository = None
+
+        default_owner = ""
+        default_repository_name = ""
+
+        if connected_repository is not None:
+            default_owner, default_repository_name = (
+                connected_repository["full_name"].split("/", 1)
             )
 
+        with st.form(key=f"github_sync_form_{selected_project_id}"):
+            github_owner = st.text_input(
+                "GitHub owner",
+                value=default_owner,
+                help="The username or organization that owns the repository.",
+                key=f"github_owner_{selected_project_id}",
+            )
+            github_repository_name = st.text_input(
+                "Repository name",
+                value=default_repository_name,
+                help="Enter the repository name, rather than its full URL.",
+                key=f"github_repository_name_{selected_project_id}",
+            )
+            sync_github = st.form_submit_button("Sync GitHub")
+
+        if sync_github:
             try:
-                connected_repository = get_github_repository(
-                    github_project_id
-                )
+                with st.spinner("Syncing GitHub repository..."):
+                    repository = fetch_github_repository(github_owner, github_repository_name,)
+                    save_github_repository(selected_project_id, repository,)
+            except ValueError as error:
+                st.warning(str(error))
             except sqlite3.Error:
-                st.error("Could not load the saved repository.")
-                connected_repository = None
-
-            default_owner = ""
-            default_repository_name = ""
-
-            if connected_repository is not None:
-                default_owner, default_repository_name = (
-                    connected_repository["full_name"].split("/", 1)
-                )
-
-            with st.form(key=f"github_sync_form_{github_project_id}"):
-                github_owner = st.text_input(
-                    "GitHub owner",
-                    value=default_owner,
-                    help="The username or organization that owns the repository.",
-                    key=f"github_owner_{github_project_id}",
-                )
-                github_repository_name = st.text_input(
-                    "Repository name",
-                    value=default_repository_name,
-                    help="Enter the repository name, rather than its full URL.",
-                    key=f"github_repository_name_{github_project_id}",
-                )
-                sync_github = st.form_submit_button("Sync GitHub")
-
-            if sync_github:
-                try:
-                    with st.spinner("Syncing GitHub repository..."):
-                        repository = fetch_github_repository(github_owner, github_repository_name,)
-                        save_github_repository(github_project_id, repository,)
-                except ValueError as error:
-                    st.warning(str(error))
-                except sqlite3.Error:
-                    st.error("Could not save the repository. Please try again.")
-                else:
-                    st.success("GitHub repository synced.")
-
-            try:
-                saved_repository = get_github_repository(github_project_id)
-            except sqlite3.Error:
-                st.error("Could not load the saved repository.")
+                st.error("Could not save the repository. Please try again.")
             else:
-                if saved_repository is None:
-                    st.info("Sync a public repository to save its information.")
-                else:
-                    st.write(saved_repository["full_name"])
-                    st.link_button("Open Repository", saved_repository["html_url"],)
-                    st.write(saved_repository["description"] or "No description provided")
-                    st.caption(
-                        f"Main language: "
-                        f"{saved_repository['language'] or 'Not specified'}"
-                    )
+                st.success("GitHub repository synced.")
 
-                    if saved_repository["pushed_at"]:
-                        last_pushed = datetime.fromisoformat(
-                            saved_repository["pushed_at"].replace("Z", "+00:00")
-                        ).astimezone()
-                        st.caption(
-                            f"Last repository push: "
-                            f"{last_pushed:%Y-%m-%d %H:%M:%S %Z}"
-                        )
-                    else:
-                        st.caption("Last repository push: Not available")
+        try:
+            saved_repository = get_github_repository(selected_project_id)
+        except sqlite3.Error:
+            st.error("Could not load the saved repository.")
+        else:
+            if saved_repository is None:
+                st.info("Sync a public repository to save its information.")
+            else:
+                st.write(saved_repository["full_name"])
+                st.link_button("Open Repository", saved_repository["html_url"],)
+                st.write(saved_repository["description"] or "No description provided")
+                st.caption(
+                    f"Main language: "
+                    f"{saved_repository['language'] or 'Not specified'}"
+                )
 
-                    github_last_synced = datetime.fromisoformat(
-                        saved_repository["last_synced_at"]
+                if saved_repository["pushed_at"]:
+                    last_pushed = datetime.fromisoformat(
+                        saved_repository["pushed_at"].replace("Z", "+00:00")
                     ).astimezone()
                     st.caption(
-                        f"Last successful sync: "
-                        f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
+                        f"Last repository push: "
+                        f"{last_pushed:%Y-%m-%d %H:%M:%S %Z}"
                     )
+                else:
+                    st.caption("Last repository push: Not available")
+
+                github_last_synced = datetime.fromisoformat(
+                    saved_repository["last_synced_at"]
+                ).astimezone()
+                st.caption(
+                    f"Last successful sync: "
+                    f"{github_last_synced:%Y-%m-%d %H:%M:%S %Z}"
+                )
+
 
 with projects_column, st.container(border=True, key="weekly_debrief", height=420):
     st.subheader("Weekly Progress")
